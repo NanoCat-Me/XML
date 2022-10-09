@@ -2,9 +2,8 @@
 // refer: https://goessner.net/download/prj/jsonxml/
 export class XMLs {
 	constructor(opts) {
-		this.name = "XML v0.1.3";
+		this.name = "XML v0.1.4";
 		this.opts = opts;
-		this.newLine = (this.opts.includes("\n")) ? "\n" : (this.opts.includes("\r")) ? "\r" : (this.opts.includes("\r\n")) ? "\r\n" : "\n";
 	};
 
 	parse(xml = new String, reviver = "") {
