@@ -18,10 +18,10 @@ export class XMLs {
 		const ATTRIBUTE_KEY = "@";
 		const CHILD_NODE_KEY = "#";
 
-		$.log(`🚧 ${$.name}, parse XML`, "");
+		//$.log(`🚧 ${$.name}, parse XML`, "");
 		let parsedXML = parseXML(xml);
 		let json = toObject(parsedXML, reviver);
-		$.log(`🚧 ${$.name}, parse XML`, `json: ${JSON.stringify(json)}`, "");
+		//$.log(`🚧 ${$.name}, parse XML`, `json: ${JSON.stringify(json)}`, "");
 		return json;
 
 		/***************** Fuctions *****************/
@@ -218,12 +218,12 @@ export class XMLs {
 	};
 
 	stringify(json = new Object, tab = "") {
-		$.log(`🚧 ${$.name}, stringify XML`, "");
+		//$.log(`🚧 ${$.name}, stringify XML`, "");
 		var XML = "";
 		for (var m in json)
 			XML += toXml(json[m], m, "");
 		XML = tab ? XML.replace(/\t/g, tab) : XML.replace(/\t|\n/g, "");
-		$.log(`🚧 ${$.name}, stringify XML`, `XML: ${XML}`, "");
+		//$.log(`🚧 ${$.name}, stringify XML`, `XML: ${XML}`, "");
 		return XML;
 		/***************** Fuctions *****************/
 		function toXml(v, name, ind) {
