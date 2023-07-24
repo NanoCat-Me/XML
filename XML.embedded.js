@@ -2,79 +2,87 @@
 // refer: https://goessner.net/download/prj/jsonxml/json2xml.js
 function XMLs(opts) {
 	return new (class {
+		#ATTRIBUTE_KEY = "@";
+		#CHILD_NODE_KEY = "#";
+		#UNESCAPE = {
+			"&amp;": "&",
+			"&lt;": "<",
+			"&gt;": ">",
+			"&apos;": "'",
+			"&quot;": '"'
+		};
+		#ESCAPE = {
+			"&": "&amp;",
+			"<": "&lt;",
+			">": "&gt;",
+			"'": "&apos;",
+			'"': "&quot;"
+		};
+		
 		constructor(opts) {
-			this.name = "XML v0.1.4";
+			this.name = "XML v0.2.0";
 			this.opts = opts;
 		};
 
 		parse(xml = new String, reviver = "") {
-			const UNESCAPE = {
-				"&amp;": "&",
-				"&lt;": "<",
-				"&gt;": ">",
-				"&apos;": "'",
-				"&quot;": '"'
-			};
-			const ATTRIBUTE_KEY = "@";
-			const CHILD_NODE_KEY = "#";
-
-			//$.log(`🚧 ${$.name}, parse XML`, "");
+			const UNESCAPE = this.#UNESCAPE;
+			const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
+			const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
 			let parsedXML = parseXML(xml);
 			let json = toObject(parsedXML, reviver);
-			//$.log(`🚧 ${$.name}, parse XML`, `json: ${JSON.stringify(json)}`, "");
 			return json;
 
 			/***************** Fuctions *****************/
 			function parseXML(text) {
-				var list = String.prototype.split.call(text, /<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
-				var length = list.length;
+				const list = text.split(/<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
+				const length = list.length;
 
 				// root element
-				var root = { f: [] };
-				var elem = root;
+				const root = { father: [] };
+				let elem = root;
 
 				// dom tree stack
-				var stack = [];
+				const stack = [];
 
-				for (var i = 0; i < length;) {
+				for (let i = 0; i < length;) {
 					// text node
-					var str = list[i++];
+					const str = list[i++];
 					if (str) appendText(str);
 
 					// child node
-					var tag = list[i++];
+					const tag = list[i++];
 					if (tag) parseNode(tag);
 				}
 
 				return root;
 
 				function parseNode(tag) {
-					var tagLength = tag.length;
-					var firstChar = tag[0];
+					const tagLength = tag.length;
+					const firstChar = tag[0];
 					if (firstChar === "/") {
 						// close tag
-						var closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
+						const closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
 						while (stack.length) {
-							var tagName = elem.n && elem.n.toLowerCase();
+							const tagName = elem.name && elem.name.toLowerCase();
 							elem = stack.pop();
 							if (tagName === closed) break;
 						}
 					} else if (firstChar === "?") {
 						// XML declaration
-						appendChild({ n: "?", r: tag.substr(1, tagLength - 2) });
+						appendChild({ name: "?", raw: tag.substr(1, tagLength - 2) });
 					} else if (firstChar === "!") {
 						if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
 							// CDATA section
 							appendText(tag.substr(8, tagLength - 10));
 						} else {
 							// comment
-							appendChild({ n: "!", r: tag.substr(1) });
+							appendChild({ name: "!", raw: tag.substr(1) });
 						}
 					} else {
-						var child = openTag(tag);
+						const child = openTag(tag);
 						appendChild(child);
 						if (tag[tagLength - 1] === "/") {
-							child.c = 1; // emptyTag
+							child.hasChild = false; // emptyTag
 						} else {
 							stack.push(elem); // openTag
 							elem = child;
@@ -83,69 +91,107 @@ function XMLs(opts) {
 				}
 
 				function appendChild(child) {
-					elem.f.push(child);
+					elem.father.push(child);
 				}
 
 				function appendText(str) {
 					str = removeSpaces(str);
 					if (str) appendChild(unescapeXML(str));
 				}
-			}
 
-
-			function openTag(tag) {
-				var elem = { f: [] };
-				tag = tag.replace(/\s*\/?$/, "");
-				var pos = tag.search(/[\s='"\/]/);
-				if (pos < 0) {
-					elem.n = tag;
-				} else {
-					elem.n = tag.substr(0, pos);
-					elem.t = tag.substr(pos);
-				}
-				return elem;
-			}
-
-			function parseAttribute(elem, reviver) {
-				if (!elem.t) return;
-				var list = elem.t.split(/([^\s='"]+(?:\s*=\s*(?:'[\S\s]*?'|"[\S\s]*?"|[^\s'"]*))?)/);
-				var length = list.length;
-				var attributes, val;
-
-				for (var i = 0; i < length; i++) {
-					var str = removeSpaces(list[i]);
-					if (!str) continue;
-
-					if (!attributes) {
-						attributes = {};
-					}
-
-					var pos = str.indexOf("=");
+				function openTag(tag) {
+					const elem = { father: [] };
+					tag = tag.replace(/\s*\/?$/, "");
+					const pos = tag.search(/[\s='"\/]/);
 					if (pos < 0) {
-						// bare attribute
-						str = ATTRIBUTE_KEY + str;
-						val = null;
+						elem.name = tag;
 					} else {
-						// attribute key/value pair
-						val = str.substr(pos + 1).replace(/^\s+/, "");
-						str = ATTRIBUTE_KEY + str.substr(0, pos).replace(/\s+$/, "");
+						elem.name = tag.substr(0, pos);
+						elem.tag = tag.substr(pos);
+					}
+					return elem;
+				}
+			}
 
-						// quote: foo="FOO" bar='BAR'
-						var firstChar = val[0];
-						var lastChar = val[val.length - 1];
-						if (firstChar === lastChar && (firstChar === "'" || firstChar === '"')) {
-							val = val.substr(1, val.length - 2);
+			function toObject(elem, reviver) {
+				let object;
+				switch (typeof elem) {
+					case "string":
+					case "undefined":
+						object = elem;
+						break;
+					case "object":
+					//default:
+						const raw = elem.raw;
+						const tag = elem.tag;
+						const childList = elem.father;
+
+						if (elem === null) object = null;
+						else if (raw) object = raw;
+						else if (tag) object = parseAttribute(tag, reviver);
+						else object = {};
+						//$.log(`🚧 ${$.name}, toObject`, `object: ${JSON.stringify(object)}`, "");
+
+						if (childList) childList.forEach((child, i) => {
+							if (!child.tag && child.hasChild === false) addObject(object, child.name, child.name, childList?.[i - 1]?.name)
+							else addObject(object, (typeof child === "string") ? CHILD_NODE_KEY : child.name, toObject(child, reviver), undefined)
+						});
+						if (Object.keys(object).length === 0) object = (elem.hasChild === false) ? null : "";
+						if (reviver) object = reviver(elem.name || "", object);
+						break;
+				}
+				return object;
+
+				function parseAttribute(tag, reviver) {
+					if (!tag) return;
+					const list = tag.split(/([^\s='"]+(?:\s*=\s*(?:'[\S\s]*?'|"[\S\s]*?"|[^\s'"]*))?)/);
+					const length = list.length;
+					let attributes, val;
+
+					for (let i = 0; i < length; i++) {
+						let str = removeSpaces(list[i]);
+						if (!str) continue;
+
+						if (!attributes) {
+							attributes = {};
 						}
 
-						val = unescapeXML(val);
+						const pos = str.indexOf("=");
+						if (pos < 0) {
+							// bare attribute
+							str = ATTRIBUTE_KEY + str;
+							val = null;
+						} else {
+							// attribute key/value pair
+							val = str.substr(pos + 1).replace(/^\s+/, "");
+							str = ATTRIBUTE_KEY + str.substr(0, pos).replace(/\s+$/, "");
+
+							// quote: foo="FOO" bar='BAR'
+							const firstChar = val[0];
+							const lastChar = val[val.length - 1];
+							if (firstChar === lastChar && (firstChar === "'" || firstChar === '"')) {
+								val = val.substr(1, val.length - 2);
+							}
+
+							val = unescapeXML(val);
+						}
+						if (reviver) val = reviver(str, val);
+
+						addObject(attributes, str, val);
 					}
-					if (reviver) {
-						val = reviver(str, val);
-					}
-					addObject(attributes, str, val);
+
+					return attributes;
 				}
 
-				return attributes;
+				function addObject(object, key, val, prevKey = key) {
+					if (typeof val === "undefined") return;
+					else {
+						const prev = object[prevKey];
+						if (Array.isArray(prev)) prev.push(val);
+						else if (prev) object[prevKey] = [prev, val];
+						else object[key] = val;
+					}
+				}
 			}
 
 			function removeSpaces(str) {
@@ -155,102 +201,48 @@ function XMLs(opts) {
 			function unescapeXML(str) {
 				return str.replace(/(&(?:lt|gt|amp|apos|quot|#(?:\d{1,6}|x[0-9a-fA-F]{1,5}));)/g, function (str) {
 					if (str[1] === "#") {
-						var code = (str[2] === "x") ? parseInt(str.substr(3), 16) : parseInt(str.substr(2), 10);
+						const code = (str[2] === "x") ? parseInt(str.substr(3), 16) : parseInt(str.substr(2), 10);
 						if (code > -1) return String.fromCharCode(code);
 					}
 					return UNESCAPE[str] || str;
 				});
 			}
 
-			function toObject(elem, reviver) {
-				if ("string" === typeof elem) return elem;
-
-				var raw = elem.r;
-				if (raw) return raw;
-
-				var attributes = parseAttribute(elem, reviver);
-				var object;
-				var childList = elem.f;
-				var childLength = childList.length;
-
-				if (attributes || childLength > 1) {
-					// merge attributes and child nodes
-					object = attributes || {};
-					childList.forEach(function (child) {
-						if ("string" === typeof child) {
-							addObject(object, CHILD_NODE_KEY, child);
-						} else {
-							addObject(object, child.n, toObject(child, reviver));
-						}
-					});
-				} else if (childLength) {
-					// the node has single child node but no attribute
-					var child = childList[0];
-					object = toObject(child, reviver);
-					if (child.n) {
-						var wrap = {};
-						wrap[child.n] = object;
-						object = wrap;
-					}
-				} else {
-					// the node has no attribute nor child node
-					object = elem.c ? null : "";
-				}
-
-				if (reviver) {
-					object = reviver(elem.n || "", object);
-				}
-
-				return object;
-			}
-
-			function addObject(object, key, val) {
-				if ("undefined" === typeof val) return;
-				var prev = object[key];
-				if (prev instanceof Array) {
-					prev.push(val);
-				} else if (key in object) {
-					object[key] = [prev, val];
-				} else {
-					object[key] = val;
-				}
-			}
 		};
 
 		stringify(json = new Object, tab = "") {
-			//$.log(`🚧 ${$.name}, stringify XML`, "");
-			var XML = "";
-			for (var m in json)
-				XML += toXml(json[m], m, "");
+			const ESCAPE = this.#ESCAPE;
+			const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
+			const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
+			let XML = "";
+			for (let elem in json) XML += toXml(json[elem], elem, "");
 			XML = tab ? XML.replace(/\t/g, tab) : XML.replace(/\t|\n/g, "");
-			//$.log(`🚧 ${$.name}, stringify XML`, `XML: ${XML}`, "");
 			return XML;
 			/***************** Fuctions *****************/
-			function toXml(v, name, ind) {
+			function toXml(elem, name, ind) {
 				let xml = "";
-				if (Array.isArray(v)) {
-					xml = v.reduce(
+				if (Array.isArray(elem)) {
+					xml = elem.reduce(
 						(prevXML, currXML) => prevXML += ind + toXml(currXML, name, ind + "\t") + "\n",
 						""
 					)
-				} else if (typeof (v) == "object") {
-					let hasChild = false;
-					xml += ind + "<" + name;
-					for (let m in v) {
-						if (m.charAt(0) == "@") xml += " " + m.substring(1) + "=\"" + v[m].toString() + "\"";
-						else hasChild = true;
-					}
-					xml += hasChild ? ">" : "/>";
-					if (hasChild) {
-						for (let m in v) {
-							if (m == "#") xml += v[m];
-							else if (m == "#cdata") xml += "<![CDATA[" + v[m] + "]]>";
-							else if (m.charAt(0) != "@") xml += toXml(v[m], m, ind + "\t");
-						}
-						xml += (xml.charAt(xml.length - 1) == "\n" ? ind : "") + "</" + name + ">";
-					}
-				} else if (name === "?") xml += ind + "<" + name + v.toString() + name + ">";
-				else xml += ind + "<" + name + ">" + v.toString() + "</" + name + ">";
+				} else if (typeof elem === "object") {
+					let attribute = "";
+					let string = "";
+					for (let name in elem) {
+						if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${elem[name].toString()}\"`;
+						else if (name.charAt(0) === CHILD_NODE_KEY) {
+							if (name === "#cdata") string += `<![CDATA[${elem[name]}]]>`;
+							else string += elem[name];
+						} else string += toXml(elem[name], name, ind + "\t");
+					};
+					let hasChild = string.length;
+					xml += `${ind}<${name}${attribute}${(hasChild) ? "/" : ""}>` +
+						(hasChild) ? "" : (string.charAt(string.length - 1) == "\n" ? ind : "")
+							+ (hasChild) ? "" : `</${name}>`;
+				} else if (typeof elem === "string") xml += ind + `<${elem.toString()}/>`;
+				else if (name === "?") xml += ind + `<${name}${elem.toString()}${name}>`;
+				else xml += ind + `<${name}>${elem.toString()}</${name}>`;
 				return xml;
 			};
 		};
