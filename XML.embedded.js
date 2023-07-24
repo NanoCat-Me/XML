@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.0";
+			this.name = "XML v0.2.1";
 			this.opts = opts;
 		};
 
@@ -228,18 +228,20 @@ function XMLs(opts) {
 					)
 				} else if (typeof elem === "object") {
 					let attribute = "";
-					let string = "";
+					let hasChild = false;
 					for (let name in elem) {
 						if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${elem[name].toString()}\"`;
-						else if (name.charAt(0) === CHILD_NODE_KEY) {
-							if (name === "#cdata") string += `<![CDATA[${elem[name]}]]>`;
-							else string += elem[name];
-						} else string += toXml(elem[name], name, ind + "\t");
-					};
-					let hasChild = string.length;
-					xml += `${ind}<${name}${attribute}${(hasChild) ? "/" : ""}>` +
-						(hasChild) ? "" : (string.charAt(string.length - 1) == "\n" ? ind : "")
-							+ (hasChild) ? "" : `</${name}>`;
+						else hasChild = true;
+					}
+					xml += `${ind}<${name}${attribute}${(hasChild) ? "" : "/"}>`;
+					if (hasChild) {
+						for (let name in elem) {
+							if (name == CHILD_NODE_KEY) xml += elem[name];
+							else if (name == "#cdata") xml += `<![CDATA[${elem[name]}]]>`;
+							else if (name.charAt(0) != "@") xml += toXml(elem[name], name, ind + "\t");
+						}
+						xml += (xml.charAt(xml.length - 1) == "\n" ? ind : "") + `</${name}>`;
+					}
 				} else if (typeof elem === "string") xml += ind + `<${elem.toString()}/>`;
 				else if (name === "?") xml += ind + `<${name}${elem.toString()}${name}>`;
 				else xml += ind + `<${name}>${elem.toString()}</${name}>`;

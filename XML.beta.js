@@ -19,7 +19,7 @@ export class XMLs {
 	};
 
 	constructor(opts) {
-		this.name = "XML v0.2.0";
+		this.name = "XML v0.2.1";
 		this.opts = opts;
 	};
 
@@ -241,19 +241,6 @@ export class XMLs {
 				)
 			} else if (typeof elem === "object") {
 				let attribute = "";
-				let string = "";
-				for (let name in elem) {
-					if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${elem[name].toString()}\"`;
-					else if (name.charAt(0) === CHILD_NODE_KEY) {
-						if (name === "#cdata") string += `<![CDATA[${elem[name]}]]>`;
-						else string += elem[name];
-					} else string += toXml(elem[name], name, ind + "\t");
-				};
-				let hasChild = string.length;
-				xml += `${ind}<${name}${attribute}${(hasChild) ? "/" : ""}>` +
-					(hasChild) ? "" : (string.charAt(string.length - 1) == "\n" ? ind : "")
-						+ (hasChild) ? "" : `</${name}>`;
-				/*
 				let hasChild = false;
 				for (let name in elem) {
 					if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${elem[name].toString()}\"`;
@@ -268,7 +255,6 @@ export class XMLs {
 					}
 					xml += (xml.charAt(xml.length - 1) == "\n" ? ind : "") + `</${name}>`;
 				}
-				*/
 			} else if (typeof elem === "string") xml += ind + `<${elem.toString()}/>`;
 			//else if (typeof elem === "undefined") xml += ind + `<${name.toString()}/>`;
 			else if (name === "?") xml += ind + `<${name}${elem.toString()}${name}>`;
