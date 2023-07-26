@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.1";
+			this.name = "XML v0.2.2";
 			this.opts = opts;
 		};
 
@@ -126,17 +126,15 @@ function XMLs(opts) {
 						const tag = elem.tag;
 						const childList = elem.father;
 
-						if (elem === null) object = null;
-						else if (raw) object = raw;
+						if (raw) object = raw;
 						else if (tag) object = parseAttribute(tag, reviver);
+						else if (elem.hasChild === false) object = { [elem.name]: undefined };
 						else object = {};
-						//$.log(`🚧 ${$.name}, toObject`, `object: ${JSON.stringify(object)}`, "");
 
 						if (childList) childList.forEach((child, i) => {
-							if (!child.tag && child.hasChild === false) addObject(object, child.name, child.name, childList?.[i - 1]?.name)
+							if (!child.tag && child.hasChild === false) addObject(object, child.name, toObject(child, reviver), childList?.[i - 1]?.name)
 							else addObject(object, (typeof child === "string") ? CHILD_NODE_KEY : child.name, toObject(child, reviver), undefined)
 						});
-						if (Object.keys(object).length === 0) object = (elem.hasChild === false) ? null : "";
 						if (reviver) object = reviver(elem.name || "", object);
 						break;
 				}
@@ -219,32 +217,35 @@ function XMLs(opts) {
 			XML = tab ? XML.replace(/\t/g, tab) : XML.replace(/\t|\n/g, "");
 			return XML;
 			/***************** Fuctions *****************/
-			function toXml(elem, name, ind) {
+			function toXml(Elem, Name, Ind) {
 				let xml = "";
-				if (Array.isArray(elem)) {
-					xml = elem.reduce(
-						(prevXML, currXML) => prevXML += ind + toXml(currXML, name, ind + "\t") + "\n",
+				if (Array.isArray(Elem)) {
+					xml = Elem.reduce(
+						(prevXML, currXML) => prevXML += Ind + toXml(currXML, Name, Ind + "\t") + "\n",
 						""
 					)
-				} else if (typeof elem === "object") {
+				} else if (typeof Elem === "object") {
 					let attribute = "";
 					let hasChild = false;
-					for (let name in elem) {
-						if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${elem[name].toString()}\"`;
+					for (let name in Elem) {
+						if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${Elem[name].toString()}\"`;
+						else if (Elem[name] === undefined) Name = name;
 						else hasChild = true;
 					}
-					xml += `${ind}<${name}${attribute}${(hasChild) ? "" : "/"}>`;
+					xml += `${Ind}<${Name}${attribute}${(hasChild) ? "" : "/"}>`;
 					if (hasChild) {
-						for (let name in elem) {
-							if (name == CHILD_NODE_KEY) xml += elem[name];
-							else if (name == "#cdata") xml += `<![CDATA[${elem[name]}]]>`;
-							else if (name.charAt(0) != "@") xml += toXml(elem[name], name, ind + "\t");
+						for (let name in Elem) {
+							if (name == CHILD_NODE_KEY) xml += Elem[name];
+							else if (name == "#cdata") xml += `<![CDATA[${Elem[name]}]]>`;
+							else if (name.charAt(0) != "@") xml += toXml(Elem[name], name, Ind + "\t");
 						}
-						xml += (xml.charAt(xml.length - 1) == "\n" ? ind : "") + `</${name}>`;
+						xml += (xml.charAt(xml.length - 1) == "\n" ? Ind : "") + `</${Name}>`;
 					}
-				} else if (typeof elem === "string") xml += ind + `<${elem.toString()}/>`;
-				else if (name === "?") xml += ind + `<${name}${elem.toString()}${name}>`;
-				else xml += ind + `<${name}>${elem.toString()}</${name}>`;
+				} else if (typeof Elem === "string") {
+					if (Name === "?") xml += Ind + `<${Name}${Elem.toString()}${Name}>`;
+					else if (Name === "!") xml += Ind + `<!--${Elem.toString()}-->`;
+					else xml += Ind + `<${Name}>${Elem.toString()}</${Name}>`;
+				} else if (typeof Elem === "undefined") xml += Ind + `<${Name.toString()}/>`;
 				return xml;
 			};
 		};
