@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.2";
+			this.name = "XML v0.2.3";
 			this.opts = opts;
 		};
 
@@ -39,6 +39,7 @@ function XMLs(opts) {
 			function parseXML(text) {
 				const list = text.split(/<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
 				const length = list.length;
+				$.log(`🚧 ${$.name}, parseXML`, `list: ${JSON.stringify(list)}`, "");
 
 				// root element
 				const root = { father: [] };
@@ -47,6 +48,7 @@ function XMLs(opts) {
 				// dom tree stack
 				const stack = [];
 
+				// parse
 				for (let i = 0; i < length;) {
 					// text node
 					const str = list[i++];
@@ -62,34 +64,47 @@ function XMLs(opts) {
 				function parseNode(tag) {
 					const tagLength = tag.length;
 					const firstChar = tag[0];
-					if (firstChar === "/") {
-						// close tag
-						const closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
-						while (stack.length) {
-							const tagName = elem.name && elem.name.toLowerCase();
-							elem = stack.pop();
-							if (tagName === closed) break;
-						}
-					} else if (firstChar === "?") {
-						// XML declaration
-						appendChild({ name: "?", raw: tag.substr(1, tagLength - 2) });
-					} else if (firstChar === "!") {
-						if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
-							// CDATA section
-							appendText(tag.substr(8, tagLength - 10));
-						} else {
-							// comment
-							appendChild({ name: "!", raw: tag.substr(1) });
-						}
-					} else {
-						const child = openTag(tag);
-						appendChild(child);
-						if (tag[tagLength - 1] === "/") {
-							child.hasChild = false; // emptyTag
-						} else {
-							stack.push(elem); // openTag
-							elem = child;
-						}
+					let child = {};
+					switch (firstChar) {
+						case "/":
+							// close tag
+							const closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
+							while (stack.length) {
+								const tagName = elem?.name?.toLowerCase?.();
+								elem = stack.pop();
+								if (tagName === closed) break;
+							}
+							break;
+						case "?":
+							// XML declaration
+							child.name = "?";
+							child.raw = tag.substr(1, tagLength - 2);
+							appendChild(child);
+							break;
+						case "!":
+							if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
+								// CDATA section
+								appendText(tag.substr(8, tagLength - 10));
+							} else {
+								// comment
+								child.name = "!";
+								child.raw = tag.substr(1);
+								appendChild(child);
+							}
+							break;
+						default:
+							//const child = openTag(tag);
+							child = openTag(tag);
+							appendChild(child);
+							switch (tag[tagLength - 1]) {
+								case "/":
+									child.hasChild = false; // emptyTag
+									break;
+								default:
+									stack.push(elem); // openTag
+									elem = child;
+							}
+							break;
 					}
 				}
 
@@ -98,7 +113,8 @@ function XMLs(opts) {
 				}
 
 				function appendText(str) {
-					str = removeSpaces(str);
+					//str = removeSpaces(str);
+					str = str?.trim?.();
 					if (str) appendChild(unescapeXML(str));
 				}
 
@@ -160,7 +176,8 @@ function XMLs(opts) {
 					let attributes, val;
 
 					for (let i = 0; i < length; i++) {
-						let str = removeSpaces(list[i]);
+						//let str = removeSpaces(list[i]);
+						let str = list[i]?.trim?.();
 						if (!str) continue;
 
 						if (!attributes) {
@@ -206,9 +223,11 @@ function XMLs(opts) {
 				}
 			}
 
+			/*
 			function removeSpaces(str) {
 				return str && str.replace(/^\s+|\s+$/g, "");
 			}
+			*/
 
 			function unescapeXML(str) {
 				return str.replace(/(&(?:lt|gt|amp|apos|quot|#(?:\d{1,6}|x[0-9a-fA-F]{1,5}));)/g, function (str) {
