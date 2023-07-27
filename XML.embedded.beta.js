@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.3";
+			this.name = "XML v0.2.4";
 			this.opts = opts;
 		};
 
@@ -42,7 +42,7 @@ function XMLs(opts) {
 				$.log(`🚧 ${$.name}, parseXML`, `list: ${JSON.stringify(list)}`, "");
 
 				// root element
-				const root = { father: [] };
+				const root = { children: [] };
 				let elem = root;
 
 				// dom tree stack
@@ -98,18 +98,20 @@ function XMLs(opts) {
 							appendChild(child);
 							switch (tag[tagLength - 1]) {
 								case "/":
-									child.hasChild = false; // emptyTag
+									//child.hasChild = false; // emptyTag
+									delete child.children; // emptyTag
 									break;
 								default:
 									stack.push(elem); // openTag
 									elem = child;
+									break;
 							}
 							break;
 					}
 				}
 
 				function appendChild(child) {
-					elem.father.push(child);
+					elem.children.push(child);
 				}
 
 				function appendText(str) {
@@ -119,7 +121,7 @@ function XMLs(opts) {
 				}
 
 				function openTag(tag) {
-					const elem = { father: [] };
+					const elem = { children: [] };
 					tag = tag.replace(/\s*\/?$/, "");
 					const pos = tag.search(/[\s='"\/]/);
 					if (pos < 0) {
@@ -143,18 +145,20 @@ function XMLs(opts) {
 					//default:
 						const raw = elem.raw;
 						const tag = elem.tag;
-						const childList = elem.father;
+						const children = elem.children;
 
 						if (raw) object = raw;
 						else if (tag) object = parseAttribute(tag, reviver);
-						else if (elem.hasChild === false) object = { [elem.name]: undefined };
+						else if (!children) object = { [elem.name]: undefined };
 						else object = {};
 						//$.log(`🚧 ${$.name}, toObject`, `object: ${JSON.stringify(object)}`, "");
 
-						if (childList) childList.forEach((child, i) => {
-							if (!child.tag && child.hasChild === false) addObject(object, child.name, toObject(child, reviver), childList?.[i - 1]?.name)
-							else addObject(object, (typeof child === "string") ? CHILD_NODE_KEY : child.name, toObject(child, reviver), undefined)
+						if (children) children.forEach((child, i) => {
+							if (typeof child === "string") addObject(object, CHILD_NODE_KEY, toObject(child, reviver), undefined)
+							else if (!child.tag && !child.children) addObject(object, child.name, toObject(child, reviver), children?.[i - 1]?.name)
+							else addObject(object, child.name, toObject(child, reviver), undefined)
 						});
+
 						/*
 						if (Object.keys(object).length === 0) {
 							if (elem.name) object[elem.name] = (elem.hasChild === false) ? null : "";
