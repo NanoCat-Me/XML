@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.2";
+			this.name = "XML v0.2.4";
 			this.opts = opts;
 		};
 
@@ -38,12 +38,13 @@ function XMLs(opts) {
 				const length = list.length;
 
 				// root element
-				const root = { father: [] };
+				const root = { children: [] };
 				let elem = root;
 
 				// dom tree stack
 				const stack = [];
 
+				// parse
 				for (let i = 0; i < length;) {
 					// text node
 					const str = list[i++];
@@ -58,49 +59,61 @@ function XMLs(opts) {
 
 				function parseNode(tag) {
 					const tagLength = tag.length;
-					const firstChar = tag[0];
-					if (firstChar === "/") {
-						// close tag
-						const closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
-						while (stack.length) {
-							const tagName = elem.name && elem.name.toLowerCase();
-							elem = stack.pop();
-							if (tagName === closed) break;
-						}
-					} else if (firstChar === "?") {
-						// XML declaration
-						appendChild({ name: "?", raw: tag.substr(1, tagLength - 2) });
-					} else if (firstChar === "!") {
-						if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
-							// CDATA section
-							appendText(tag.substr(8, tagLength - 10));
-						} else {
-							// comment
-							appendChild({ name: "!", raw: tag.substr(1) });
-						}
-					} else {
-						const child = openTag(tag);
-						appendChild(child);
-						if (tag[tagLength - 1] === "/") {
-							child.hasChild = false; // emptyTag
-						} else {
-							stack.push(elem); // openTag
-							elem = child;
-						}
+					let child = {};
+					switch (tag[0]) {
+						case "/":
+							// close tag
+							const closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
+							while (stack.length) {
+								const tagName = elem?.name?.toLowerCase?.();
+								elem = stack.pop();
+								if (tagName === closed) break;
+							}
+							break;
+						case "?":
+							// XML declaration
+							child.name = "?";
+							child.raw = tag.substr(1, tagLength - 2);
+							appendChild(child);
+							break;
+						case "!":
+							if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
+								// CDATA section
+								appendText(tag.substr(8, tagLength - 10));
+							} else {
+								// comment
+								child.name = "!";
+								child.raw = tag.substr(1);
+								appendChild(child);
+							}
+							break;
+						default:
+							child = openTag(tag);
+							appendChild(child);
+							switch (tag[tagLength - 1]) {
+								case "/":
+									delete child.children; // emptyTag
+									break;
+								default:
+									stack.push(elem); // openTag
+									elem = child;
+									break;
+							}
+							break;
 					}
 				}
 
 				function appendChild(child) {
-					elem.father.push(child);
+					elem.children.push(child);
 				}
 
 				function appendText(str) {
-					str = removeSpaces(str);
+					str = str?.trim?.();
 					if (str) appendChild(unescapeXML(str));
 				}
 
 				function openTag(tag) {
-					const elem = { father: [] };
+					const elem = { children: [] };
 					tag = tag.replace(/\s*\/?$/, "");
 					const pos = tag.search(/[\s='"\/]/);
 					if (pos < 0) {
@@ -124,16 +137,17 @@ function XMLs(opts) {
 					//default:
 						const raw = elem.raw;
 						const tag = elem.tag;
-						const childList = elem.father;
+						const children = elem.children;
 
 						if (raw) object = raw;
 						else if (tag) object = parseAttribute(tag, reviver);
-						else if (elem.hasChild === false) object = { [elem.name]: undefined };
+						else if (!children) object = { [elem.name]: undefined };
 						else object = {};
 
-						if (childList) childList.forEach((child, i) => {
-							if (!child.tag && child.hasChild === false) addObject(object, child.name, toObject(child, reviver), childList?.[i - 1]?.name)
-							else addObject(object, (typeof child === "string") ? CHILD_NODE_KEY : child.name, toObject(child, reviver), undefined)
+						if (children) children.forEach((child, i) => {
+							if (typeof child === "string") addObject(object, CHILD_NODE_KEY, toObject(child, reviver), undefined)
+							else if (!child.tag && !child.children) addObject(object, child.name, toObject(child, reviver), children?.[i - 1]?.name)
+							else addObject(object, child.name, toObject(child, reviver), undefined)
 						});
 						if (reviver) object = reviver(elem.name || "", object);
 						break;
@@ -147,7 +161,7 @@ function XMLs(opts) {
 					let attributes, val;
 
 					for (let i = 0; i < length; i++) {
-						let str = removeSpaces(list[i]);
+						let str = list[i]?.trim?.();
 						if (!str) continue;
 
 						if (!attributes) {
@@ -190,10 +204,6 @@ function XMLs(opts) {
 						else object[key] = val;
 					}
 				}
-			}
-
-			function removeSpaces(str) {
-				return str && str.replace(/^\s+|\s+$/g, "");
 			}
 
 			function unescapeXML(str) {
