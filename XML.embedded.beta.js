@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.5";
+			this.name = "XML v0.2.6";
 			this.opts = opts;
 		};
 
@@ -82,8 +82,20 @@ function XMLs(opts) {
 							break;
 						case "!":
 							if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
+								$.log(`🚧 ${$.name}, parseXML`, `CDATA: ${tag.substr(8, tagLength - 10)}`, "");
 								// CDATA section
+								child.name = "!CDATA"; // CDATA
 								appendText(tag.substr(8, tagLength - 10));
+							/*
+							} else if (tag.substr(1, 7) === "DOCTYPE") {
+								const raws = tag.substr(1).split(" ");
+								$.log(`🚧 ${$.name}, parseXML`, `raws: ${JSON.stringify(raws)}`, "");
+								// DOCTYPE
+								child.name = "!DOCTYPE";
+								child.doctype = raws[1];
+								child.raw = raws[2];
+								appendChild(child);
+							*/
 							} else {
 								// comment
 								child.name = "!";
@@ -278,7 +290,8 @@ function XMLs(opts) {
 					if (hasChild) {
 						for (let name in Elem) {
 							if (name == CHILD_NODE_KEY) xml += Elem[name];
-							else if (name == "#cdata") xml += `<![CDATA[${Elem[name]}]]>`;
+							else if (name == "!CDATA") xml += `<![CDATA[${Elem[name]}]]>`;
+							//else if (name == "!DOCTYPE") xml += `<!DOCTYPE ${Elem[name]}>`;
 							else if (name.charAt(0) != "@") xml += toXml(Elem[name], name, Ind + "\t");
 						}
 						xml += (xml.charAt(xml.length - 1) == "\n" ? Ind : "") + `</${Name}>`;
