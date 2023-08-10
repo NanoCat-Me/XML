@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.4";
+			this.name = "XML v0.2.5";
 			this.opts = opts;
 		};
 
@@ -114,7 +114,8 @@ function XMLs(opts) {
 
 				function appendText(str) {
 					//str = removeSpaces(str);
-					str = str?.trim?.();
+					str = removeBreakLine(str);
+					//str = str?.trim?.();
 					if (str) appendChild(unescapeXML(str));
 				}
 
@@ -178,8 +179,9 @@ function XMLs(opts) {
 					let attributes, val;
 
 					for (let i = 0; i < length; i++) {
-						//let str = removeSpaces(list[i]);
-						let str = list[i]?.trim?.();
+						let str = removeSpaces(list[i]);
+						//let str = removeBreakLine(list[i]);
+						//let str = list[i]?.trim?.();
 						if (!str) continue;
 
 						if (!attributes) {
@@ -225,11 +227,14 @@ function XMLs(opts) {
 				}
 			}
 
-			/*
-			function removeSpaces(str) {
-				return str && str.replace(/^\s+|\s+$/g, "");
+			function removeBreakLine(str) {
+				return str?.replace?.(/^(\r\n|\r|\n|\t)+|(\r\n|\r|\n|\t)+$/g, "");
 			}
-			*/
+
+			function removeSpaces(str) {
+				//return str && str.replace(/^\s+|\s+$/g, "");
+				return str?.trim?.();
+			}
 
 			function unescapeXML(str) {
 				return str.replace(/(&(?:lt|gt|amp|apos|quot|#(?:\d{1,6}|x[0-9a-fA-F]{1,5}));)/g, function (str) {
