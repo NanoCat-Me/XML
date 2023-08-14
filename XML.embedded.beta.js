@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.3.0";
+			this.name = "XML v0.3.1";
 			this.opts = opts;
 		};
 
@@ -119,21 +119,6 @@ function XMLs(opts) {
 							break;
 					}
 
-					function appendChild(child) {
-						elem.children.push(child);
-					}
-
-					function appendText(str) {
-						//str = removeSpaces(str);
-						str = removeBreakLine(str);
-						//str = str?.trim?.();
-						if (str) appendChild(unescapeXML(str));
-
-						function removeBreakLine(str) {
-							return str?.replace?.(/^(\r\n|\r|\n|\t)+|(\r\n|\r|\n|\t)+$/g, "");
-						}
-					}
-
 					function openTag(tag) {
 						const elem = { children: [] };
 						tag = tag.replace(/\s*\/?$/, "");
@@ -146,6 +131,21 @@ function XMLs(opts) {
 						}
 						return elem;
 					}
+				}
+
+				function appendText(str) {
+					//str = removeSpaces(str);
+					str = removeBreakLine(str);
+					//str = str?.trim?.();
+					if (str) appendChild(unescapeXML(str));
+
+					function removeBreakLine(str) {
+						return str?.replace?.(/^(\r\n|\r|\n|\t)+|(\r\n|\r|\n|\t)+$/g, "");
+					}
+				}
+
+				function appendChild(child) {
+					elem.children.push(child);
 				}
 			}
 
@@ -167,7 +167,7 @@ function XMLs(opts) {
 
 						//if (raw) object = raw;
 						//else if (tag) object = parseAttribute(tag, reviver);
-						//else if (!children) object = { [elem.name]: undefined };
+						//else if (!children) object = { [name]: undefined };
 						//else object = {};
 						object = {};
 						$.log(`🚧 ${$.name}, PlistToObject`, `object: ${JSON.stringify(object)}`, "");
@@ -179,7 +179,7 @@ function XMLs(opts) {
 								break;
 							case "dict":
 								let dict = children.map(child => PlistToObject(child, reviver));
-								$.log(`🚧 ${$.name}, PlistToObject`, `middle dict: ${JSON.stringify(dict)}`, "");								
+								$.log(`🚧 ${$.name}, PlistToObject`, `middle dict: ${JSON.stringify(dict)}`, "");
 								dict = chunk(dict, 2);
 								object = Object.fromEntries(dict);
 								$.log(`🚧 ${$.name}, PlistToObject`, `after dict: ${JSON.stringify(dict)}`, "");
@@ -202,12 +202,12 @@ function XMLs(opts) {
 							case "integer":
 								const integer = children[0];
 								$.log(`🚧 ${$.name}, PlistToObject`, `integer: ${integer}`, "");
-								object = Number(children[0]);
+								object = parseInt(children[0]);
 								break;
 							case "real":
 								const real = children[0];
 								$.log(`🚧 ${$.name}, PlistToObject`, `real: ${real}`, "");
-								object = Number(children[0]);
+								object = parseFloat(children[0]);
 								break;
 							case "string":
 								const string = children[0];
@@ -257,9 +257,9 @@ function XMLs(opts) {
 						else object = {};
 						//$.log(`🚧 ${$.name}, toObject`, `object: ${JSON.stringify(object)}`, "");
 
-						if (children) children.forEach((child, i) => {
-							if (child.name === "plist") addObject(object, child.name, PlistToObject(child, reviver), undefined)
-							else if (typeof child === "string") addObject(object, CHILD_NODE_KEY, toObject(child, reviver), undefined)
+						if (name === "plist") object = Object.assign(object, PlistToObject(children[0], reviver));
+						else if (children) children.forEach((child, i) => {
+							if (typeof child === "string") addObject(object, CHILD_NODE_KEY, toObject(child, reviver), undefined)
 							else if (!child.tag && !child.children) addObject(object, child.name, toObject(child, reviver), children?.[i - 1]?.name)
 							else addObject(object, child.name, toObject(child, reviver), undefined)
 						});
@@ -364,10 +364,14 @@ function XMLs(opts) {
 			function toXml(Elem, Name, Ind) {
 				let xml = "";
 				if (Array.isArray(Elem)) {
+					if (Name === "plist") xml += `${Ind}${PlistToXml(Elem[Name], Name, `${Ind}\t`)}\n`;
+					else for (var i=0, n=Elem.length; i<n; i++) xml += `${Ind}${toXml(Elem[i], Name, `${Ind}\t`)}\n`;
+					/*
 					xml = Elem.reduce(
-						(prevXML, currXML) => prevXML += Ind + toXml(currXML, Name, Ind + "\t") + "\n",
+						(prevXML, currXML) => prevXML += Ind + toXml(currXML, Name, `${Ind}\t`) + "\n",
 						""
 					)
+					*/
 				} else if (typeof Elem === "object") {
 					let attribute = "";
 					let hasChild = false;
@@ -382,6 +386,7 @@ function XMLs(opts) {
 							if (name == CHILD_NODE_KEY) xml += Elem[name];
 							else if (name == "!CDATA") xml += `<![CDATA[${Elem[name]}]]>`;
 							//else if (name == "!DOCTYPE") xml += `<!DOCTYPE ${Elem[name]}>`;
+							else if (name === "plist") xml += PlistToXml(Elem[name], name, Ind + "\t");
 							else if (name.charAt(0) != "@") xml += toXml(Elem[name], name, Ind + "\t");
 						}
 						xml += (xml.charAt(xml.length - 1) == "\n" ? Ind : "") + `</${Name}>`;
@@ -391,6 +396,38 @@ function XMLs(opts) {
 					else if (Name === "!") xml += Ind + `<!--${Elem.toString()}-->`;
 					else xml += Ind + `<${Name}>${Elem.toString()}</${Name}>`;
 				} else if (typeof Elem === "undefined") xml += Ind + `<${Name.toString()}/>`;
+				return xml;
+			};
+
+			function PlistToXml(Elem, Name, Ind) {
+				let xml = "";
+				switch (typeof Elem) {
+					case "boolean":
+						xml += `${Ind}<${Elem.toString()}/>`;
+						break;
+					case "number":
+						if (Elem.toString().includes(".")) xml += `${Ind}<real>${Elem.toString()}</real>\n`;
+						else xml += `${Ind}<integer>${Elem.toString()}</integer>\n`;
+						break;
+					case "string":
+						xml += `${Ind}<string>${Elem.toString()}</string>\n`;
+						break;
+					case "object":
+						if (Array.isArray(Elem)) {
+							xml += `${Ind}<array>\n`;
+							for (var i=0, n=Elem.length; i<n; i++) xml += `${Ind}${PlistToXml(Elem[i], Name, `${Ind}\t`)}\n`;
+							xml += `${Ind}</array>\n`;
+						} else {
+							xml += `${Ind}<dict>\n`;
+							//for (let name in Elem) xml += PlistToXml(Elem[name], name, Ind + "\t");
+							Object.entries(Elem).forEach(([key, value]) => {
+								xml += `${Ind}<key>${key}</key>\n`;
+								xml += PlistToXml(value, key, Ind);
+							});
+							xml += `${Ind}</dict>\n`;
+						}
+						break;
+				}
 				return xml;
 			};
 		};
