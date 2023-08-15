@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.3.6";
+			this.name = "XML v0.3.6-2";
 			this.opts = opts;
 			BigInt.prototype.toJSON = () => this.toString();
 		};
@@ -157,7 +157,6 @@ function XMLs(opts) {
 			function fromPlist(elem, reviver) {
 				//$.log(`☑️ ${$.name}, fromPlist`, `typeof elem: ${typeof elem}`, "");
 				//$.log(`🚧 ${$.name}, fromPlist`, `elem: ${JSON.stringify(elem)}`, "");
-
 				let object;
 				switch (typeof elem) {
 					case "string":
@@ -197,24 +196,24 @@ function XMLs(opts) {
 							case "false":
 								const boolean = name;
 								//$.log(`🚧 ${$.name}, fromPlist`, `boolean: ${boolean}`, "");
-								object = JSON.parse(name);
+								object = JSON.parse(boolean);
 								break;
 							case "integer":
 								const integer = children[0];
 								$.log(`🚧 ${$.name}, fromPlist`, `integer: ${integer}`, "");
-								//object = parseInt(children[0]);
-								object = BigInt(children[0]);
+								//object = parseInt(integer);
+								object = BigInt(integer);
 								break;
 							case "real":
 								const real = children[0];
 								$.log(`🚧 ${$.name}, fromPlist`, `real: ${real}`, "");
 								//const digits = real.split(".")[1]?.length || 0;
-								object = parseFloat(children[0])//.toFixed(digits);
+								object = parseFloat(real)//.toFixed(digits);
 								break;
 							case "string":
 								const string = children[0];
 								//$.log(`🚧 ${$.name}, fromPlist`, `string: ${string}`, "");
-								object = children[0];
+								object = string;
 								break;
 						};
 						if (reviver) object = reviver(name || "", object);
@@ -261,7 +260,7 @@ function XMLs(opts) {
 						//$.log(`🚧 ${$.name}, fromXML`, `object: ${JSON.stringify(object)}`, "");
 
 						if (name === "plist") object = Object.assign(object, fromPlist(children[0], reviver));
-						else if (children) children.forEach((child, i) => {
+						else children?.forEach?.((child, i) => {
 							if (typeof child === "string") addObject(object, CHILD_NODE_KEY, fromXML(child, reviver), undefined)
 							else if (!child.tag && !child.children && !child.raw) addObject(object, child.name, fromXML(child, reviver), children?.[i - 1]?.name)
 							else addObject(object, child.name, fromXML(child, reviver), undefined)
@@ -381,9 +380,8 @@ function XMLs(opts) {
 								if (name[0] === ATTRIBUTE_KEY) {
 									attribute += ` ${name.substring(1)}=\"${Elem[name].toString()}\"`;
 									delete Elem[name];
-								} else if (Elem[name] === undefined) {
-									Name = name;
-								} else hasChild = true;
+								} else if (Elem[name] === undefined) Name = name;
+								else hasChild = true;
 							}
 							xml += `${Ind}<${Name}${attribute}${(hasChild) ? "" : "/"}>`;
 							if (hasChild) {

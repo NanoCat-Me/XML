@@ -20,20 +20,21 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.2.5";
+			this.name = "XML v0.3.6-2";
 			this.opts = opts;
+			BigInt.prototype.toJSON = () => this.toString();
 		};
 
 		parse(xml = new String, reviver = "") {
 			const UNESCAPE = this.#UNESCAPE;
 			const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
 			const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
-			let parsedXML = parseXML(xml);
-			let json = toObject(parsedXML, reviver);
+			const DOM = toDOM(xml);
+			let json = fromXML(DOM, reviver);
 			return json;
 
 			/***************** Fuctions *****************/
-			function parseXML(text) {
+			function toDOM(text) {
 				const list = text.split(/<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
 				const length = list.length;
 
@@ -54,11 +55,9 @@ function XMLs(opts) {
 					const tag = list[i++];
 					if (tag) parseNode(tag);
 				}
-
 				return root;
-
+				/***************** Fuctions *****************/
 				function parseNode(tag) {
-					const tagLength = tag.length;
 					let child = {};
 					switch (tag[0]) {
 						case "/":
@@ -71,26 +70,38 @@ function XMLs(opts) {
 							}
 							break;
 						case "?":
-							// XML declaration
-							child.name = "?";
-							child.raw = tag.substr(1, tagLength - 2);
+							if (tag.slice(1, 4) === "xml") {
+								// XML declaration
+								child.name = "?xml";
+								child.raw = tag.slice(5, -1);
+							} else {
+								// XML declaration
+								child.name = "?";
+								child.raw = tag.slice(1, -1);
+							};
 							appendChild(child);
 							break;
 						case "!":
-							if (tag.substr(1, 7) === "[CDATA[" && tag.substr(-2) === "]]") {
+							if (tag.slice(1, 8) === "DOCTYPE") {
+								// DOCTYPE section
+								child.name = "!DOCTYPE";
+								child.raw = tag.slice(9);
+							} else if (tag.slice(1, 8) === "[CDATA[" && tag.slice(-2) === "]]") {
 								// CDATA section
-								appendText(tag.substr(8, tagLength - 10));
+								child.name = "!CDATA";
+								child.raw = tag.slice(9, -2);
+								//appendText(tag.slice(9, -2));
 							} else {
-								// comment
+								// Comment section
 								child.name = "!";
-								child.raw = tag.substr(1);
-								appendChild(child);
-							}
+								child.raw = tag.slice(1);
+							};
+							appendChild(child);
 							break;
 						default:
 							child = openTag(tag);
 							appendChild(child);
-							switch (tag[tagLength - 1]) {
+							switch (tag.slice(-1)) {
 								case "/":
 									delete child.children; // emptyTag
 									break;
@@ -101,32 +112,98 @@ function XMLs(opts) {
 							}
 							break;
 					}
-				}
 
-				function appendChild(child) {
-					elem.children.push(child);
+					function openTag(tag) {
+						const elem = { children: [] };
+						tag = tag.replace(/\s*\/?$/, "");
+						const pos = tag.search(/[\s='"\/]/);
+						if (pos < 0) {
+							elem.name = tag;
+						} else {
+							elem.name = tag.substr(0, pos);
+							elem.tag = tag.substr(pos);
+						}
+						return elem;
+					}
 				}
 
 				function appendText(str) {
 					str = removeBreakLine(str);
 					if (str) appendChild(unescapeXML(str));
+
+					function removeBreakLine(str) {
+						return str?.replace?.(/^(\r\n|\r|\n|\t)+|(\r\n|\r|\n|\t)+$/g, "");
+					}
 				}
 
-				function openTag(tag) {
-					const elem = { children: [] };
-					tag = tag.replace(/\s*\/?$/, "");
-					const pos = tag.search(/[\s='"\/]/);
-					if (pos < 0) {
-						elem.name = tag;
-					} else {
-						elem.name = tag.substr(0, pos);
-						elem.tag = tag.substr(pos);
-					}
-					return elem;
+				function appendChild(child) {
+					elem.children.push(child);
 				}
+			};
+			/***************** Fuctions *****************/
+			function fromPlist(elem, reviver) {
+				let object;
+				switch (typeof elem) {
+					case "string":
+					case "undefined":
+						object = elem;
+						break;
+					case "object":
+						//default:
+						const name = elem.name;
+						const children = elem.children;
+
+						object = {};
+
+						switch (name) {
+							case "plist":
+								let plist = fromPlist(children[0], reviver);
+								object = Object.assign(object, plist)
+								break;
+							case "dict":
+								let dict = children.map(child => fromPlist(child, reviver));
+								dict = chunk(dict, 2);
+								object = Object.fromEntries(dict);
+								break;
+							case "array":
+								if (!Array.isArray(object)) object = [];
+								object = children.map(child => fromPlist(child, reviver));
+								break;
+							case "key":
+								const key = children[0];
+								object = key;
+								break;
+							case "true":
+							case "false":
+								const boolean = name;
+								object = JSON.parse(boolean);
+								break;
+							case "integer":
+								const integer = children[0];
+								object = BigInt(integer);
+								break;
+							case "real":
+								const real = children[0];
+								object = parseFloat(real)//.toFixed(digits);
+								break;
+							case "string":
+								const string = children[0];
+								object = string;
+								break;
+						};
+						if (reviver) object = reviver(name || "", object);
+						break;
+				}
+				return object;
+
+				function chunk(source, length) {
+					var index = 0, target = [];
+					while (index < source.length) target.push(source.slice(index, index += length));
+					return target;
+				};
 			}
 
-			function toObject(elem, reviver) {
+			function fromXML(elem, reviver) {
 				let object;
 				switch (typeof elem) {
 					case "string":
@@ -136,24 +213,26 @@ function XMLs(opts) {
 					case "object":
 					//default:
 						const raw = elem.raw;
+						const name = elem.name;
 						const tag = elem.tag;
 						const children = elem.children;
 
 						if (raw) object = raw;
 						else if (tag) object = parseAttribute(tag, reviver);
-						else if (!children) object = { [elem.name]: undefined };
+						else if (!children) object = { [name]: undefined };
 						else object = {};
 
-						if (children) children.forEach((child, i) => {
-							if (typeof child === "string") addObject(object, CHILD_NODE_KEY, toObject(child, reviver), undefined)
-							else if (!child.tag && !child.children) addObject(object, child.name, toObject(child, reviver), children?.[i - 1]?.name)
-							else addObject(object, child.name, toObject(child, reviver), undefined)
+						if (name === "plist") object = Object.assign(object, fromPlist(children[0], reviver));
+						else children?.forEach?.((child, i) => {
+							if (typeof child === "string") addObject(object, CHILD_NODE_KEY, fromXML(child, reviver), undefined)
+							else if (!child.tag && !child.children && !child.raw) addObject(object, child.name, fromXML(child, reviver), children?.[i - 1]?.name)
+							else addObject(object, child.name, fromXML(child, reviver), undefined)
 						});
-						if (reviver) object = reviver(elem.name || "", object);
+						if (reviver) object = reviver(name || "", object);
 						break;
 				}
 				return object;
-
+				/***************** Fuctions *****************/
 				function parseAttribute(tag, reviver) {
 					if (!tag) return;
 					const list = tag.split(/([^\s='"]+(?:\s*=\s*(?:'[\S\s]*?'|"[\S\s]*?"|[^\s'"]*))?)/);
@@ -193,6 +272,10 @@ function XMLs(opts) {
 					}
 
 					return attributes;
+
+					function removeSpaces(str) {
+						return str?.trim?.();
+					}
 				}
 
 				function addObject(object, key, val, prevKey = key) {
@@ -204,15 +287,6 @@ function XMLs(opts) {
 						else object[key] = val;
 					}
 				}
-			}
-
-			function removeBreakLine(str) {
-				return str?.replace?.(/^(\r\n|\r|\n|\t)+|(\r\n|\r|\n|\t)+$/g, "");
-			}
-
-			function removeSpaces(str) {
-				//return str && str.replace(/^\s+|\s+$/g, "");
-				return str?.trim?.();
 			}
 
 			function unescapeXML(str) {
@@ -238,34 +312,103 @@ function XMLs(opts) {
 			/***************** Fuctions *****************/
 			function toXml(Elem, Name, Ind) {
 				let xml = "";
-				if (Array.isArray(Elem)) {
-					xml = Elem.reduce(
-						(prevXML, currXML) => prevXML += Ind + toXml(currXML, Name, Ind + "\t") + "\n",
-						""
-					)
-				} else if (typeof Elem === "object") {
-					let attribute = "";
-					let hasChild = false;
-					for (let name in Elem) {
-						if (name.charAt(0) === ATTRIBUTE_KEY) attribute += ` ${name.substring(1)}=\"${Elem[name].toString()}\"`;
-						else if (Elem[name] === undefined) Name = name;
-						else hasChild = true;
-					}
-					xml += `${Ind}<${Name}${attribute}${(hasChild) ? "" : "/"}>`;
-					if (hasChild) {
-						for (let name in Elem) {
-							if (name == CHILD_NODE_KEY) xml += Elem[name];
-							else if (name == "#cdata") xml += `<![CDATA[${Elem[name]}]]>`;
-							else if (name.charAt(0) != "@") xml += toXml(Elem[name], name, Ind + "\t");
-						}
-						xml += (xml.charAt(xml.length - 1) == "\n" ? Ind : "") + `</${Name}>`;
-					}
-				} else if (typeof Elem === "string") {
-					if (Name === "?") xml += Ind + `<${Name}${Elem.toString()}${Name}>`;
-					else if (Name === "!") xml += Ind + `<!--${Elem.toString()}-->`;
-					else xml += Ind + `<${Name}>${Elem.toString()}</${Name}>`;
-				} else if (typeof Elem === "undefined") xml += Ind + `<${Name.toString()}/>`;
+				switch (typeof Elem) {
+					case "object":
+						if (Array.isArray(Elem)) {
+							xml = Elem.reduce(
+								(prevXML, currXML) => prevXML += `${Ind}${toXml(currXML, Name, `${Ind}\t`)}\n`,
+								""
+							);
+						} else {
+							let attribute = "";
+							let hasChild = false;
+							for (let name in Elem) {
+								if (name[0] === ATTRIBUTE_KEY) {
+									attribute += ` ${name.substring(1)}=\"${Elem[name].toString()}\"`;
+									delete Elem[name];
+								} else if (Elem[name] === undefined) Name = name;
+								else hasChild = true;
+							}
+							xml += `${Ind}<${Name}${attribute}${(hasChild) ? "" : "/"}>`;
+							if (hasChild) {
+								if (Name === "plist") xml += toPlist(Elem, Name, `${Ind}\t`);
+								else {
+									for (let name in Elem) {
+										switch (name) {
+											case CHILD_NODE_KEY:
+												xml += Elem[name];
+												break;
+											default:
+												xml += toXml(Elem[name], name, `${Ind}\t`);
+												break;
+										};
+									};
+								};
+								xml += (xml.slice(-1) === "\n" ? Ind : "") + `</${Name}>`;
+							};
+						};
+						break;
+					case "string":
+						switch (Name) {
+							case "?xml":
+								xml += `${Ind}<${Name} ${Elem.toString()}?>\n`;
+								break;
+							case "?":
+								xml += `${Ind}<${Name}${Elem.toString()}${Name}>`;
+								break;
+							case "!":
+								xml += `${Ind}<!--${Elem.toString()}-->`;
+								break;
+							case "!DOCTYPE":
+								xml += `${Ind}<!DOCTYPE ${Elem.toString()}>`;
+								break;
+							case "!CDATA":
+								xml += `${Ind}<![CDATA[${Elem.toString()}]]>`;
+							case CHILD_NODE_KEY:
+								xml += Elem;
+								break;
+							default:
+								xml += `${Ind}<${Name}>${Elem.toString()}</${Name}>`;
+						};
+						break;
+					case "undefined":
+						xml += Ind + `<${Name.toString()}/>`;
+						break;
+				};
 				return xml;
+			};
+
+			function toPlist(Elem, Name, Ind) {
+				let plist = "";
+				switch (typeof Elem) {
+					case "boolean":
+						plist = `${Ind}<${Elem.toString()}/>`;
+						break;
+					case "number":
+						plist = `${Ind}<real>${Elem.toString()}</real>`;
+						break;
+					case "bigint":
+						plist = `${Ind}<integer>${Elem.toString()}</integer>`;
+						break;
+					case "string":
+						plist = `${Ind}<string>${Elem.toString()}</string>`;
+						break;
+					case "object":
+						let array = "";
+						if (Array.isArray(Elem)) {
+							for (var i = 0, n = Elem.length; i < n; i++) array += `${Ind}${toPlist(Elem[i], Name, `${Ind}\t`)}`;
+							plist = `${Ind}<array>${array}${Ind}</array>`;
+						} else {
+							let dict = "";
+							Object.entries(Elem).forEach(([key, value]) => {
+								dict += `${Ind}<key>${key}</key>`;
+								dict += toPlist(value, key, Ind);
+							});
+							plist = `${Ind}<dict>${dict}${Ind}</dict>`;
+						};
+						break;
+				}
+				return plist;
 			};
 		};
 	})(opts)
