@@ -20,7 +20,7 @@ function XMLs(opts) {
 		};
 		
 		constructor(opts) {
-			this.name = "XML v0.3.6-2";
+			this.name = "XML v0.4.0";
 			this.opts = opts;
 			BigInt.prototype.toJSON = () => this.toString();
 		};
@@ -35,7 +35,8 @@ function XMLs(opts) {
 
 			/***************** Fuctions *****************/
 			function toDOM(text) {
-				const list = text.split(/<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
+				const list = text.replace(/^[ \t]+/gm, "")
+					.split(/<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
 				const length = list.length;
 
 				// root element
@@ -58,8 +59,11 @@ function XMLs(opts) {
 				return root;
 				/***************** Fuctions *****************/
 				function parseNode(tag) {
+					const tags = tag.split(" ");
+					const name = tags.shift();
+					const length = tags.length;
 					let child = {};
-					switch (tag[0]) {
+					switch (name[0]) {
 						case "/":
 							// close tag
 							const closed = tag.replace(/^\/|[\s\/].*$/g, "").toLowerCase();
@@ -70,48 +74,48 @@ function XMLs(opts) {
 							}
 							break;
 						case "?":
-							if (tag.slice(1, 4) === "xml") {
-								// XML declaration
-								child.name = "?xml";
-								child.raw = tag.slice(5, -1);
-							} else {
-								// XML declaration
-								child.name = "?";
-								child.raw = tag.slice(1, -1);
-							};
+							// XML declaration
+							child.name = name;
+							child.raw = tags.join(" ");
 							appendChild(child);
 							break;
 						case "!":
-							if (tag.slice(1, 8) === "DOCTYPE") {
-								// DOCTYPE section
-								child.name = "!DOCTYPE";
-								child.raw = tag.slice(9);
-							} else if (tag.slice(1, 8) === "[CDATA[" && tag.slice(-2) === "]]") {
+							if (/!\[CDATA\[(.+)\]\]/.test(tag)) {
 								// CDATA section
 								child.name = "!CDATA";
-								child.raw = tag.slice(9, -2);
+								//child.raw = tag.slice(9, -2);
+								child.raw = tag.match(/!\[CDATA\[(.+)\]\]/);
 								//appendText(tag.slice(9, -2));
 							} else {
 								// Comment section
-								child.name = "!";
-								child.raw = tag.slice(1);
+								child.name = name;
+								child.raw = tags.join(" ");
 							};
 							appendChild(child);
 							break;
 						default:
 							child = openTag(tag);
 							appendChild(child);
-							switch (tag.slice(-1)) {
+							switch (tags[length - 1] ?? name.slice(-1)) {
 								case "/":
+									//child.hasChild = false; // emptyTag
 									delete child.children; // emptyTag
 									break;
 								default:
-									stack.push(elem); // openTag
-									elem = child;
+									switch (name) {
+										case "link":
+											//child.hasChild = false; // emptyTag
+											delete child.children; // emptyTag
+											break;
+										default:
+											stack.push(elem); // openTag
+											elem = child;
+											break;
+									};
 									break;
-							}
+							};
 							break;
-					}
+					};
 
 					function openTag(tag) {
 						const elem = { children: [] };
@@ -124,11 +128,13 @@ function XMLs(opts) {
 							elem.tag = tag.substr(pos);
 						}
 						return elem;
-					}
-				}
+					};
+				};
 
 				function appendText(str) {
+					//str = removeSpaces(str);
 					str = removeBreakLine(str);
+					//str = str?.trim?.();
 					if (str) appendChild(unescapeXML(str));
 
 					function removeBreakLine(str) {
@@ -180,10 +186,12 @@ function XMLs(opts) {
 								break;
 							case "integer":
 								const integer = children[0];
+								//object = parseInt(integer);
 								object = BigInt(integer);
 								break;
 							case "real":
 								const real = children[0];
+								//const digits = real.split(".")[1]?.length || 0;
 								object = parseFloat(real)//.toFixed(digits);
 								break;
 							case "string":
@@ -196,6 +204,13 @@ function XMLs(opts) {
 				}
 				return object;
 
+				/** 
+				 * Chunk Array
+				 * @author VirgilClyne
+				 * @param {Array} source - source
+				 * @param {Number} length - number
+				 * @return {Array<*>} target
+				 */
 				function chunk(source, length) {
 					var index = 0, target = [];
 					while (index < source.length) target.push(source.slice(index, index += length));
@@ -228,6 +243,16 @@ function XMLs(opts) {
 							else if (!child.tag && !child.children && !child.raw) addObject(object, child.name, fromXML(child, reviver), children?.[i - 1]?.name)
 							else addObject(object, child.name, fromXML(child, reviver), undefined)
 						});
+						if (children && children.length === 0) addObject(object, CHILD_NODE_KEY, null, undefined);
+						/*
+						if (Object.keys(object).length === 0) {
+							if (elem.name) object[elem.name] = (elem.hasChild === false) ? null : "";
+							else object = (elem.hasChild === false) ? null : "";
+						}
+						*/
+						
+						//if (Object.keys(object).length === 0) addObject(object, elem.name, (elem.hasChild === false) ? null : "");
+						//if (Object.keys(object).length === 0) object = (elem.hasChild === false) ? undefined : "";
 						if (reviver) object = reviver(name || "", object);
 						break;
 				}
@@ -241,6 +266,8 @@ function XMLs(opts) {
 
 					for (let i = 0; i < length; i++) {
 						let str = removeSpaces(list[i]);
+						//let str = removeBreakLine(list[i]);
+						//let str = list[i]?.trim?.();
 						if (!str) continue;
 
 						if (!attributes) {
@@ -274,6 +301,7 @@ function XMLs(opts) {
 					return attributes;
 
 					function removeSpaces(str) {
+						//return str && str.replace(/^\s+|\s+$/g, "");
 						return str?.trim?.();
 					}
 				}
@@ -282,6 +310,7 @@ function XMLs(opts) {
 					if (typeof val === "undefined") return;
 					else {
 						const prev = object[prevKey];
+						//const curr = object[key];
 						if (Array.isArray(prev)) prev.push(val);
 						else if (prev) object[prevKey] = [prev, val];
 						else object[key] = val;
@@ -329,14 +358,15 @@ function XMLs(opts) {
 								} else if (Elem[name] === undefined) Name = name;
 								else hasChild = true;
 							}
-							xml += `${Ind}<${Name}${attribute}${(hasChild) ? "" : "/"}>`;
+							xml += `${Ind}<${Name}${attribute}${(hasChild || Name === "link") ? "" : "/"}>`;
+
 							if (hasChild) {
 								if (Name === "plist") xml += toPlist(Elem, Name, `${Ind}\t`);
 								else {
 									for (let name in Elem) {
 										switch (name) {
 											case CHILD_NODE_KEY:
-												xml += Elem[name];
+												xml += Elem[name] ?? "";
 												break;
 											default:
 												xml += toXml(Elem[name], name, `${Ind}\t`);
@@ -351,7 +381,7 @@ function XMLs(opts) {
 					case "string":
 						switch (Name) {
 							case "?xml":
-								xml += `${Ind}<${Name} ${Elem.toString()}?>\n`;
+								xml += `${Ind}<${Name} ${Elem.toString()}>`;
 								break;
 							case "?":
 								xml += `${Ind}<${Name}${Elem.toString()}${Name}>`;
@@ -360,15 +390,17 @@ function XMLs(opts) {
 								xml += `${Ind}<!--${Elem.toString()}-->`;
 								break;
 							case "!DOCTYPE":
-								xml += `${Ind}<!DOCTYPE ${Elem.toString()}>`;
+								xml += `${Ind}<${Name} ${Elem.toString()}>`;
 								break;
 							case "!CDATA":
 								xml += `${Ind}<![CDATA[${Elem.toString()}]]>`;
+								break;
 							case CHILD_NODE_KEY:
 								xml += Elem;
 								break;
 							default:
 								xml += `${Ind}<${Name}>${Elem.toString()}</${Name}>`;
+								break;
 						};
 						break;
 					case "undefined":
@@ -412,4 +444,4 @@ function XMLs(opts) {
 			};
 		};
 	})(opts)
-}
+};
