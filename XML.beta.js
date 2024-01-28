@@ -19,7 +19,7 @@ export class XMLs {
 	};
 
 	constructor(opts) {
-		this.name = "XML v0.4.0";
+		this.name = "XML v0.4.0-2";
 		this.opts = opts;
 		BigInt.prototype.toJSON = () => this.toString();
 	};
@@ -102,7 +102,7 @@ export class XMLs {
 					default:
 						child = openTag(tag);
 						appendChild(child);
-						switch (tags[length - 1] ?? name.slice(-1)) {
+						switch ((tags?.[length - 1] ?? name).slice(-1)) {
 							case "/":
 								//child.hasChild = false; // emptyTag
 								delete child.children; // emptyTag
