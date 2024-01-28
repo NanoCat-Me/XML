@@ -1,6 +1,6 @@
 // refer: https://github.com/Peng-YM/QuanX/blob/master/Tools/XMLParser/xml-parser.js
 // refer: https://goessner.net/download/prj/jsonxml/
-export class XMLs {
+export default class XML {
 	#ATTRIBUTE_KEY = "@";
 	#CHILD_NODE_KEY = "#";
 	#UNESCAPE = {
@@ -28,19 +28,14 @@ export class XMLs {
 		const UNESCAPE = this.#UNESCAPE;
 		const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
 		const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
-		$.log(`☑️ ${$.name}, parse XML`, "");
 		const DOM = toDOM(xml);
-		//$.log(`🚧 ${$.name}, parse XML`, `toDOM: ${JSON.stringify(DOM)}`, "");
 		let json = fromXML(DOM, reviver);
-		//$.log(`🚧 ${$.name}, parse XML`, `json: ${JSON.stringify(json)}`, "");
 		return json;
 
 		/***************** Fuctions *****************/
 		function toDOM(text) {
-			$.log(`☑️ ${$.name}, toDOM`, "");
 			const list = text.replace(/^[ \t]+/gm, "")
 				.split(/<([^!<>?](?:'[\S\s]*?'|"[\S\s]*?"|[^'"<>])*|!(?:--[\S\s]*?--|\[[^\[\]'"<>]+\[[\S\s]*?]]|DOCTYPE[^\[<>]*?\[[\S\s]*?]|(?:ENTITY[^"<>]*?"[\S\s]*?")?[\S\s]*?)|\?[\S\s]*?\?)>/);
-			$.log(`🚧 ${$.name}, toDOM`, `list: ${JSON.stringify(list)}`, "");
 			const length = list.length;
 
 			// root element
@@ -60,14 +55,12 @@ export class XMLs {
 				const tag = list[i++];
 				if (tag) parseNode(tag);
 			}
-			$.log(`✅ ${$.name}, toDOM`, `root: ${JSON.stringify(root)}`, "");
 			return root;
 			/***************** Fuctions *****************/
 			function parseNode(tag) {
 				const tags = tag.split(" ");
 				const name = tags.shift();
 				const length = tags.length;
-				$.log(`🚧 ${$.name}, toDOM`, `tag: ${tag}, tags: ${JSON.stringify(tags)}, name: ${name}, name[0]: ${name[0]}`, "");
 				let child = {};
 				switch (name[0]) {
 					case "/":
@@ -154,8 +147,6 @@ export class XMLs {
 		};
 		/***************** Fuctions *****************/
 		function fromPlist(elem, reviver) {
-			//$.log(`☑️ ${$.name}, fromPlist`, `typeof elem: ${typeof elem}`, "");
-			//$.log(`🚧 ${$.name}, fromPlist`, `elem: ${JSON.stringify(elem)}`, "");
 			let object;
 			switch (typeof elem) {
 				case "string":
@@ -168,7 +159,6 @@ export class XMLs {
 					const children = elem.children;
 
 					object = {};
-					//$.log(`🚧 ${$.name}, fromPlist`, `object: ${JSON.stringify(object)}`, "");
 
 					switch (name) {
 						case "plist":
@@ -177,10 +167,8 @@ export class XMLs {
 							break;
 						case "dict":
 							let dict = children.map(child => fromPlist(child, reviver));
-							//$.log(`🚧 ${$.name}, fromPlist`, `middle dict: ${JSON.stringify(dict)}`, "");
 							dict = chunk(dict, 2);
 							object = Object.fromEntries(dict);
-							//$.log(`🚧 ${$.name}, fromPlist`, `after dict: ${JSON.stringify(dict)}`, "");
 							break;
 						case "array":
 							if (!Array.isArray(object)) object = [];
@@ -188,37 +176,31 @@ export class XMLs {
 							break;
 						case "key":
 							const key = children[0];
-							//$.log(`🚧 ${$.name}, fromPlist`, `key: ${key}`, "");
 							object = key;
 							break;
 						case "true":
 						case "false":
 							const boolean = name;
-							//$.log(`🚧 ${$.name}, fromPlist`, `boolean: ${boolean}`, "");
 							object = JSON.parse(boolean);
 							break;
 						case "integer":
 							const integer = children[0];
-							$.log(`🚧 ${$.name}, fromPlist`, `integer: ${integer}`, "");
 							//object = parseInt(integer);
 							object = BigInt(integer);
 							break;
 						case "real":
 							const real = children[0];
-							$.log(`🚧 ${$.name}, fromPlist`, `real: ${real}`, "");
 							//const digits = real.split(".")[1]?.length || 0;
 							object = parseFloat(real)//.toFixed(digits);
 							break;
 						case "string":
 							const string = children[0];
-							//$.log(`🚧 ${$.name}, fromPlist`, `string: ${string}`, "");
 							object = string;
 							break;
 					};
 					if (reviver) object = reviver(name || "", object);
 					break;
 			}
-			//$.log(`✅ ${$.name}, fromPlist`, `object: ${JSON.stringify(object)}`, "");
 			return object;
 
 			/** 
@@ -229,16 +211,13 @@ export class XMLs {
 			 * @return {Array<*>} target
 			 */
 			function chunk(source, length) {
-				//$.log(`☑️ ${$.name}, Chunk Array`, "");
 				var index = 0, target = [];
 				while (index < source.length) target.push(source.slice(index, index += length));
-				//$.log(`✅ ${$.name}, Chunk Array`, `target: ${JSON.stringify(target)}`, "");
 				return target;
 			};
 		}
 
 		function fromXML(elem, reviver) {
-			//$.log(`☑️ ${$.name}, fromXML`, `typeof elem: ${typeof elem}`, "");
 			let object;
 			switch (typeof elem) {
 				case "string":
@@ -256,7 +235,6 @@ export class XMLs {
 					else if (tag) object = parseAttribute(tag, reviver);
 					else if (!children) object = { [name]: undefined };
 					else object = {};
-					//$.log(`🚧 ${$.name}, fromXML`, `object: ${JSON.stringify(object)}`, "");
 
 					if (name === "plist") object = Object.assign(object, fromPlist(children[0], reviver));
 					else children?.forEach?.((child, i) => {
@@ -277,7 +255,6 @@ export class XMLs {
 					if (reviver) object = reviver(name || "", object);
 					break;
 			}
-			//$.log(`✅ ${$.name}, fromXML`, `object: ${JSON.stringify(object)}`, "");
 			return object;
 			/***************** Fuctions *****************/
 			function parseAttribute(tag, reviver) {
@@ -356,11 +333,9 @@ export class XMLs {
 		const ESCAPE = this.#ESCAPE;
 		const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
 		const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
-		$.log(`☑️ ${$.name}, stringify XML`, "");
 		let XML = "";
 		for (let elem in json) XML += toXml(json[elem], elem, "");
 		XML = tab ? XML.replace(/\t/g, tab) : XML.replace(/\t|\n/g, "");
-		//$.log(`🚧 ${$.name}, stringify XML`, `XML: ${XML}`, "");
 		return XML;
 		/***************** Fuctions *****************/
 		function toXml(Elem, Name, Ind) {
@@ -388,7 +363,6 @@ export class XMLs {
 							if (Name === "plist") xml += toPlist(Elem, Name, `${Ind}\t`);
 							else {
 								for (let name in Elem) {
-									$.log(`🚧 ${$.name}, stringify XML`, `name: ${name}`, "")
 									switch (name) {
 										case CHILD_NODE_KEY:
 											xml += Elem[name] ?? "";
@@ -432,13 +406,10 @@ export class XMLs {
 					xml += Ind + `<${Name.toString()}/>`;
 					break;
 			};
-			$.log(`✅ ${$.name}, toXml`, `xml: ${xml}`, "");
 			return xml;
 		};
 
 		function toPlist(Elem, Name, Ind) {
-			$.log(`☑️ ${$.name}, toPlist`, `typeof Elem: ${typeof Elem}`, "");
-			//$.log(`🚧 ${$.name}, toPlist`, `Elem: ${JSON.stringify(Elem)}`, "");
 			let plist = "";
 			switch (typeof Elem) {
 				case "boolean":
@@ -468,7 +439,6 @@ export class XMLs {
 					};
 					break;
 			}
-			$.log(`✅ ${$.name}, toPlist`, `plist: ${plist}`, "");
 			return plist;
 		};
 	};
