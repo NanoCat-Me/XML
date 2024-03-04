@@ -1,16 +1,20 @@
 // refer: https://github.com/Peng-YM/QuanX/blob/master/Tools/XMLParser/xml-parser.js
 // refer: https://goessner.net/download/prj/jsonxml/
 export default class XML {
-	#ATTRIBUTE_KEY = "@";
-	#CHILD_NODE_KEY = "#";
-	#UNESCAPE = {
+	static name = "XML";
+	static version = "0.4.1";
+	static about = () => console.log(`\n🟧 ${this.name} v${this.version}\n`);
+	
+	static #ATTRIBUTE_KEY = "@";
+	static #CHILD_NODE_KEY = "#";
+	static #UNESCAPE = {
 		"&amp;": "&",
 		"&lt;": "<",
 		"&gt;": ">",
 		"&apos;": "'",
 		"&quot;": '"'
 	};
-	#ESCAPE = {
+	static #ESCAPE = {
 		"&": "&amp;",
 		"<": "&lt;",
 		">": "&gt;",
@@ -18,13 +22,7 @@ export default class XML {
 		'"': "&quot;"
 	};
 
-	constructor(opts) {
-		this.name = "XML v0.4.0-2";
-		this.opts = opts;
-		BigInt.prototype.toJSON = () => this.toString();
-	};
-
-	parse(xml = new String, reviver = "") {
+	static parse(xml = new String, reviver = "") {
 		const UNESCAPE = this.#UNESCAPE;
 		const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
 		const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
@@ -352,7 +350,8 @@ export default class XML {
 
 	};
 
-	stringify(json = new Object, tab = "") {
+	static stringify(json = new Object, tab = "") {
+		BigInt.prototype.toJSON = () => this.toString();
 		const ESCAPE = this.#ESCAPE;
 		const ATTRIBUTE_KEY = this.#ATTRIBUTE_KEY;
 		const CHILD_NODE_KEY = this.#CHILD_NODE_KEY;
